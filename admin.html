@@ -971,28 +971,32 @@ function handleIconDrop(e){
 }
 async function uploadIconFiles(files){
   const prog=document.getElementById('upload-prog'),bar=document.getElementById('prog-bar'),txt=document.getElementById('prog-txt');
-  prog.style.display='block';let done=0;
+  prog.style.display='block';
+  let done=0, fail=0;
+
   for(const file of files){
-    txt.textContent=`上传 ${file.name}（${done+1}/${files.length}）`;
-    bar.style.width=(done/files.length*100)+'%';
+    txt.textContent=`上传 ${file.name}（${done+fail+1}/${files.length}）`;
+    bar.style.width=((done+fail)/files.length*100)+'%';
     try{
       const bytes=new Uint8Array(await file.arrayBuffer());
       let sha='';
-      try{const ex=await gh(`contents/${ICONS_DIR}/${encodeURIComponent(file.name)}?ref=${BRANCH}`);sha=ex.sha;}catch{}
+      try{
+        const ex=await gh(`contents/${ICONS_DIR}/${file.name}?ref=${BRANCH}`);
+        sha=ex.sha;
+      }catch{}
       await putBinary(`${ICONS_DIR}/${file.name}`,bytes,sha,`upload icon: ${file.name}`);
-      done++;bar.style.width=(done/files.length*100)+'%';
-    }catch(e){toast('上传 '+file.name+' 失败：'+e.message,'err');}
+      done++;
+      bar.style.width=((done+fail)/files.length*100)+'%';
+      // 每上传成功一个就立刻刷新，让用户看到实时进度
+      await loadIcons();
+    }catch(e){
+      fail++;
+      toast('上传 '+file.name+' 失败：'+e.message,'err');
+    }
   }
+
   prog.style.display='none';
-  toast('✅ 上传完成，共 '+done+' 个图标');
-  await loadIcons();
-}
-async function deleteIcon(name,sha){
-  if(!confirm('确定删除图标 '+name+'？'))return;
-  try{
-    await delFile(`${ICONS_DIR}/${name}`,sha,`delete icon: ${name}`);
-    iconsData=iconsData.filter(i=>i.name!==name);renderIconsGrid();toast('已删除 '+name);
-  }catch(e){toast('删除失败：'+e.message,'err');}
+  if(done>0) toast(`✅ 上传完成，共 ${done} 个图标${fail>0?`，${fail} 个失败`:''}` );
 }
 
 async function saveAll(){
