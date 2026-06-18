@@ -6,14 +6,15 @@
         "title": "GitHub",
         "url": "https://github.com/dashboard",
         "desc": "代码托管、开源协作",
-        "data-desc": "全球最大代码托管与开源协作平台，GitHub、git"
+        "data-desc": "全球最大代码托管与开源协作平台，GitHub、git",
+        "icon": "icons/logos/github.svg",
+        "intranet": "测试"
       },
       {
         "title": "哔哩哔哩",
         "url": "https://www.bilibili.com/",
         "desc": "视频、动漫、弹幕",
-        "data-desc": "视频弹幕网站，涵盖动漫、学习与娱乐，B站、b站",
-        "intranet": "https://www.bilibili.com/anime"
+        "data-desc": "视频弹幕网站，涵盖动漫、学习与娱乐，B站、b站"
       },
       {
         "title": "知乎",
@@ -90,7 +91,8 @@
         "title": "DeepSeek",
         "url": "https://chat.deepseek.com/",
         "desc": "国产顶级AI大模型",
-        "data-desc": "国产顶级 AI 大模型，深度思考、代码辅助，深度求索，DeepSeek R1"
+        "data-desc": "国产顶级 AI 大模型，深度思考、代码辅助，深度求索，DeepSeek R1",
+        "icon": "icons/logos/deepseek-copy-copy-copy-copy-copy.svg"
       },
       {
         "title": "Kimi",
@@ -108,7 +110,8 @@
         "title": "通义千问",
         "url": "https://tongyi.aliyun.com/",
         "desc": "阿里AI大模型",
-        "data-desc": "阿里巴巴旗下通义千问 AI 大模型，Qwen，支持长文档与多模态"
+        "data-desc": "阿里巴巴旗下通义千问 AI 大模型，Qwen，支持长文档与多模态",
+        "icon": "icons/logos/通义千问.svg"
       },
       {
         "title": "豆包",
@@ -144,8 +147,7 @@
         "title": "可灵",
         "url": "https://klingai.kuaishou.com/",
         "desc": "快手AI视频生成",
-        "data-desc": "快手旗下可灵 AI 视频生成工具，文生视频、图生视频",
-        "icon": "icons/logos/可灵.svg"
+        "data-desc": "快手旗下可灵 AI 视频生成工具，文生视频、图生视频"
       },
       {
         "title": "Suno",
@@ -798,7 +800,8 @@
         "title": "闲鱼",
         "url": "https://www.xianyu.com/",
         "desc": "二手交易平台",
-        "data-desc": "阿里旗下二手物品交易平台，闲鱼，闲置转让、捡漏好物"
+        "data-desc": "阿里旗下二手物品交易平台，闲鱼，闲置转让、捡漏好物",
+        "icon": "icons/logos/闲鱼.svg"
       },
       {
         "title": "得物",
@@ -810,7 +813,8 @@
         "title": "大众点评",
         "url": "https://www.dianping.com/",
         "desc": "餐饮生活点评",
-        "data-desc": "美团旗下餐饮与生活消费点评平台，大众点评，美食推荐、团购"
+        "data-desc": "美团旗下餐饮与生活消费点评平台，大众点评，美食推荐、团购",
+        "icon": "icons/logos/大众点评.svg"
       },
       {
         "title": "美团",
