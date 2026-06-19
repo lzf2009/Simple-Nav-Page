@@ -148,7 +148,7 @@ Worker 会代理以下资源：
 <img width="1272" height="844" alt="New Fine-grained Personal Access Token (18 06 2026 21_22)" src="https://github.com/user-attachments/assets/425ae79e-d2ac-499a-8f13-b5779465151d" />
 
 7. 复制token并保存本地任意位置，忘记需要重新申请
-8. 打开admin.html,修改 const HARDCODED_REPO   = '你的用户名/Simple-Nav-Page';
+8. 编辑admin.html文件,修改 const HARDCODED_REPO   = '你的用户名/Simple-Nav-Page';
 9. 打开后台（你的导航页网址/admin）
 10. 第一次需要输入token和自定义短密码，后续可通过短密码登录（换设备和浏览器后需要重新输入token）
 11. 修改后台内容后点击保存到github
