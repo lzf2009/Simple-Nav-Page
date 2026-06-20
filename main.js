@@ -3,7 +3,7 @@
    =========================== */
 
 // ── 图标 & 背景 配置 ────────────────────────────────────────
-const FAVICON_PROVIDER = 'google';
+const FAVICON_PROVIDER = 'duckduckgo';
 const PROXY = 'https://sim.1546879868.workers.dev';
 
 function withProxy(originUrl) {
