@@ -1,7 +1,1 @@
-name = "sim"
-main = "worker.js"
-compatibility_date = "2024-01-01"
 
-# 可选：如果图标等静态文件需要一起部署，可以配置 assets
-# [assets]
-# directory = "./"
