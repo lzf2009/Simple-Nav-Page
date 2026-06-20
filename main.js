@@ -1,429 +1,266 @@
-/* ===========================
-   王五导航 · main.js
-   =========================== */
+/* ===================================================
+ *  Simple Nav Page - 主逻辑脚本
+ *  包含功能：
+ *    - 随机背景图
+ *    - 搜索引擎切换与搜索
+ *    - 站内链接过滤（基于 links.json）
+ *    - 图标获取代理配置
+ *    - 内外网切换（预留接口）
+ * =================================================== */
 
-// ── 图标 & 背景 配置 ────────────────────────────────────────
+// ========== 基础配置 ==========
+/** 图标源：'google' 或 'duckduckgo' */
 const FAVICON_PROVIDER = 'duckduckgo';
+
+/** 图标代理地址，解决国内访问缓慢 */
 const PROXY = 'https://sim.1546879868.workers.dev';
 
-function withProxy(originUrl) {
-  if (!PROXY) return originUrl;
-  return PROXY + '/' + originUrl.replace(/^https?:\/\//, '');
-}
+/** 自定义图标本地路径前缀 */
+const SITE_ICON_BASE = location.origin + location.pathname.replace(/\/[^/]*$/, '') + '/icons/logos/';
 
-function buildFaviconUrl(domain) {
-  if (!domain) return DEFAULT_ICON;
-  if (FAVICON_PROVIDER === 'google')
-    return withProxy(`https://www.google.com/s2/favicons?sz=64&domain=${domain}`);
-  if (FAVICON_PROVIDER === 'duckduckgo')
-    return withProxy(`https://icons.duckduckgo.com/ip3/${domain}.ico`);
-  return DEFAULT_ICON;
-}
-
-// ── 内外网切换 ────────────────────────────────────────────────
-let isIntranet = localStorage.getItem('netMode') === 'intranet';
-let _linksData = null;
-
-function getCardUrl(item) {
-  return (isIntranet && item.intranet) ? item.intranet : item.url;
-}
-
-function toggleNetMode() {
-  isIntranet = !isIntranet;
-  localStorage.setItem('netMode', isIntranet ? 'intranet' : 'internet');
-  updateNetToggleBtn();
-  document.querySelectorAll('.card[data-url][data-intranet]').forEach(a => {
-    const url = isIntranet ? a.dataset.intranet : a.dataset.url;
-    a.href = url;
-    const popup = a.querySelector('.info-popup');
-    if (popup) popup.textContent = getDomain(url) ?? url;
-    const badge = a.querySelector('.net-badge');
-    if (badge) badge.textContent = isIntranet ? '内' : '外';
-  });
-}
-window.toggleNetMode = toggleNetMode;
-
-function updateNetToggleBtn() {
-  const btn = document.getElementById('netToggleBtn');
-  if (!btn) return;
-  btn.textContent = isIntranet ? '🏠 内网' : '🌐 外网';
-  btn.classList.toggle('intranet-active', isIntranet);
-}
-
-function injectNetToggleBtn() {
-  if (document.getElementById('netToggleBtn')) return;
-  const btn = document.createElement('button');
-  btn.id        = 'netToggleBtn';
-  btn.className = 'net-toggle-btn';
-  btn.addEventListener('click', function () { toggleNetMode(); });
-  document.body.appendChild(btn);
-}
-
-// ────────────────────────────────────────────────────────────
-const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-const BG_API = isMobile
-  ? 'https://imgapi.cn/api.php?zd=mobile&fl=fengjing&gs=images&t='
-  : 'https://imgapi.cn/api.php?fl=fengjing&gs=images&t=';
-const LINKS_FILE = 'links.json';
-const DEFAULT_ICON = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiPjwvY2lyY2xlPjxwYXRoIGQ9Ik0yIDEyaDIwIj48L3BhdGg+PHBhdGggZD0iTTEyIDJhMTUuMyAxNS4zIDAgMCAxIDQgMTAgMTUuMyAxNS4zIDAgMCAxLTQgMTAgMTUuMyAxNS4zIDAgMCAxLTQtMTAgMTUuMyAxNS4zIDAgMCAxIDQtMTB6Ij48L3BhdGg+PC9zdmc+';
-
-/* ── 搜索分类数据 ── */
-const SEARCH_CATEGORIES = [
+// ========== 搜索引擎列表 ==========
+/**
+ * 已移除百度、搜狗、360，新增 GitHub
+ * 每个引擎需提供 name, icon, searchUrl (用 {query} 占位), type
+ */
+const searchEngines = [
   {
-    id: 'engine', label: '引擎', icon: '🔍',
-    engines: [
-      { name: '百度',       icon: '🔵', url: 'https://www.baidu.com/s?wd=',           domain: 'baidu.com' },
-      { name: 'Google',     icon: '🌐', url: 'https://www.google.com/search?q=',      domain: 'google.com' },
-      { name: 'Brave',      icon: '🦁', url: 'https://search.brave.com/search?q=',    domain: 'search.brave.com' },
-      { name: '搜狗',       icon: '🐶', url: 'https://www.sogou.com/web?query=',      domain: 'sogou.com' },
-      { name: 'Bing',       icon: '🔷', url: 'https://www.bing.com/search?q=',        domain: 'bing.com' },
-      { name: 'DuckDuckGo', icon: '🦆', url: 'https://duckduckgo.com/?q=',            domain: 'duckduckgo.com' },
-      { name: '360',        icon: '🟢', url: 'https://www.so.com/s?q=',               domain: 'so.com' },
-      { name: '夸克',       icon: '⚡', url: 'https://www.quark.cn/s?q=',             domain: 'quark.cn' },
-    ]
+    name: 'GitHub',
+    icon: 'https://github.com/favicon.ico',
+    searchUrl: 'https://github.com/search?q={query}',
+    type: 'web'
   },
   {
-    id: 'community', label: '社区', icon: '💬',
-    engines: [
-      { name: 'GitHub', icon: '🐱', url: 'https://github.com/search?q=',             domain: 'github.com' },
-      { name: '微博',   icon: '🌊', url: 'https://s.weibo.com/weibo?q=',              domain: 'weibo.com' },
-      { name: '知乎',   icon: '🔵', url: 'https://www.zhihu.com/search?q=',           domain: 'zhihu.com' },
-      { name: '豆瓣',   icon: '🟢', url: 'https://www.douban.com/search?q=',          domain: 'douban.com' },
-      { name: '贴吧',   icon: '🟠', url: 'https://tieba.baidu.com/f/search/res?qw=',  domain: 'tieba.baidu.com' },
-      { name: 'Reddit', icon: '🔴', url: 'https://www.reddit.com/search/?q=',         domain: 'reddit.com' },
-    ]
+    name: 'Google',
+    icon: 'https://www.google.com/favicon.ico',
+    searchUrl: 'https://www.google.com/search?q={query}',
+    type: 'web'
   },
   {
-    id: 'video', label: '视频', icon: '🎬',
-    engines: [
-      { name: 'B站',    icon: '📺', url: 'https://search.bilibili.com/all?keyword=', domain: 'bilibili.com' },
-      { name: '腾讯',   icon: '🐧', url: 'https://v.qq.com/search.html#stag=0&s=',  domain: 'v.qq.com' },
-      { name: '爱奇艺', icon: '🟢', url: 'https://so.iqiyi.com/so/q_',              domain: 'iqiyi.com' },
-      { name: '优酷',   icon: '🔵', url: 'https://so.youku.com/search_video/q_',    domain: 'youku.com' },
-      { name: '芒果',   icon: '🟡', url: 'https://so.mgtv.com/so/k-',               domain: 'mgtv.com' },
-    ]
+    name: 'Bing',
+    icon: 'https://www.bing.com/favicon.ico',
+    searchUrl: 'https://www.bing.com/search?q={query}',
+    type: 'web'
   },
   {
-    id: 'music', label: '音乐', icon: '🎵',
-    engines: [
-      { name: 'QQ音乐', icon: '🟢', url: 'https://y.qq.com/portal/search.html#page=1&searchid=1&remoteplace=txt.yqq.top&t=song&w=', domain: 'y.qq.com' },
-      { name: '网易云', icon: '🔴', url: 'https://music.163.com/#/search/m/?s=',                                                    domain: 'music.163.com' },
-    ]
-  },
-  {
-    id: 'life', label: '生活', icon: '🛒',
-    engines: [
-      { name: '淘宝',   icon: '🟠', url: 'https://s.taobao.com/search?q=',                              domain: 'taobao.com' },
-      { name: '京东',   icon: '🔴', url: 'https://search.jd.com/Search?keyword=',                       domain: 'jd.com' },
-      { name: '拼多多', icon: '🟣', url: 'https://mobile.yangkeduo.com/search_result.html?search_key=',  domain: 'pinduoduo.com' },
-      { name: '做菜',   icon: '🍳', url: 'https://www.xiachufang.com/search/?keyword=',                  domain: 'xiachufang.com' },
-      { name: '翻译',   icon: '🌐', url: 'https://fanyi.baidu.com/#zh/en/',                             domain: 'fanyi.baidu.com' },
-    ]
-  },
-  {
-    id: 'job', label: '求职', icon: '💼',
-    engines: [
-      { name: '智联招聘', icon: '🔵', url: 'https://sou.zhaopin.com/?jl=530&kw=',                         domain: 'zhaopin.com' },
-      { name: 'BOSS直聘', icon: '🟡', url: 'https://www.zhipin.com/web/geek/job?query=',                  domain: 'zhipin.com' },
-      { name: '猎聘',     icon: '🟠', url: 'https://www.liepin.com/zhaopin/?key=',                        domain: 'liepin.com' },
-      { name: '前程无忧', icon: '🔴', url: 'https://search.51job.com/list/000000,000000,0000,00,9,99,',   domain: '51job.com' },
-      { name: '拉勾网',   icon: '🟢', url: 'https://www.lagou.com/wn/jobs?kd=',                           domain: 'lagou.com' },
-    ]
-  },
+    name: 'DuckDuckGo',
+    icon: 'https://duckduckgo.com/favicon.ico',
+    searchUrl: 'https://duckduckgo.com/?q={query}',
+    type: 'web'
+  }
 ];
 
-let currentCategoryId = 'engine';
-let currentEngine     = SEARCH_CATEGORIES[0].engines[0];
-let enginePanelOpen   = false;
+// ========== 当前状态 ==========
+let currentEngineIndex = 0;           // 当前选中的搜索引擎索引
+let linksData = [];                   // 从 links.json 加载的站点数据（现为空）
 
-/* ── 工具 ── */
+// ========== 工具函数 ==========
+/**
+ * HTML 安全转义，防 XSS
+ */
+function esc(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * 从 URL 提取域名
+ */
 function getDomain(url) {
-  try { return new URL(url).hostname; } catch { return null; }
-}
-function faviconSrc(url) { return buildFaviconUrl(getDomain(url)); }
-function engineFavicon(engine) { return buildFaviconUrl(engine.domain); }
-
-/* ── 渲染分类 Tab ── */
-function renderSearchTabs() {
-  const tabsEl = document.getElementById('searchTabs');
-  tabsEl.innerHTML = '';
-  SEARCH_CATEGORIES.forEach(cat => {
-    const btn = document.createElement('button');
-    btn.className = 'search-tab' + (cat.id === currentCategoryId ? ' active' : '');
-    btn.innerHTML = `<span class="tab-icon">${cat.icon}</span><span class="tab-label">${cat.label}</span>`;
-    btn.onclick = () => {
-      selectCategory(cat.id);
-      // 切换分类时若面板已开，刷新内容
-      if (enginePanelOpen) renderEnginePanel();
-    };
-    tabsEl.appendChild(btn);
-  });
+  try { return new URL(url).hostname; } catch (e) { return ''; }
 }
 
-/* ── 更新搜索框显示的引擎 ── */
-function updateSearchBoxEngine() {
-  const icon   = document.getElementById('search-engine-icon');
-  const nameEl = document.getElementById('engineName');
-  icon.src = engineFavicon(currentEngine);
-  icon.onerror = () => { icon.src = DEFAULT_ICON; icon.onerror = null; };
-  nameEl.textContent = currentEngine.name;
+/**
+ * 根据配置生成 favicon 地址（自动走代理）
+ */
+function buildFaviconUrl(domain) {
+  if (!domain) {
+    // 无域名时返回默认地球图标（base64 SVG）
+    return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIi8+PHBhdGggZD0iTTIgMTJoMjAiLz48cGF0aCBkPSJNMTIgMmExNS4zIDE1LjMgMCAwIDEgNCAxMCAxNS4zIDE1LjMgMCAwIDEtNCAxMCAxNS4zIDE1LjMgMCAwIDEtNC0xMCAxNS4zIDE1LjMgMCAwIDEgNC0xMHoiLz48L3N2Zz4=';
+  }
+  let url;
+  if (FAVICON_PROVIDER === 'google') {
+    url = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+  } else {
+    url = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+  }
+  // 添加代理前缀
+  if (PROXY) {
+    url = PROXY + '/' + url.replace(/^https?:\/\//, '');
+  }
+  return url;
 }
 
-/* ── 切换分类 ── */
-function selectCategory(catId) {
-  currentCategoryId = catId;
-  const cat = SEARCH_CATEGORIES.find(c => c.id === catId);
-  currentEngine = cat.engines[0];
-  renderSearchTabs();
-  updateSearchBoxEngine();
+// ========== 搜索引擎面板渲染 ==========
+function renderEnginePanel() {
+  const panel = document.getElementById('enginePanel');
+  panel.innerHTML = searchEngines.map((engine, idx) => {
+    const active = idx === currentEngineIndex;
+    return `
+      <div class="engine-item ${active ? 'active' : ''}" onclick="switchEngine(${idx})" title="${esc(engine.name)}">
+        <img src="${esc(engine.icon)}" alt="${esc(engine.name)}" onerror="this.style.display='none'">
+        <span>${esc(engine.name)}</span>
+        ${active ? '<span class="check-mark">✓</span>' : ''}
+      </div>`;
+  }).join('');
 }
 
-/* ── 切换引擎 ── */
-function selectEngine(engine) {
-  currentEngine = engine;
-  updateSearchBoxEngine();
-  renderEnginePanel(); // 刷新高亮
+function switchEngine(index) {
+  currentEngineIndex = index;
+  updateCurrentEngineDisplay();
+  renderEnginePanel();
+  toggleEnginePanel(false);
   document.getElementById('searchInput').focus();
 }
 
-/* ── 渲染内联引擎面板（只显示当前分类） ── */
-function renderEnginePanel() {
+function toggleEnginePanel(force) {
   const panel = document.getElementById('enginePanel');
-  panel.innerHTML = '';
-  const cat = SEARCH_CATEGORIES.find(c => c.id === currentCategoryId);
-  if (!cat) return;
-
-  cat.engines.forEach(engine => {
-    const btn = document.createElement('button');
-    btn.className = 'engine-btn' + (engine === currentEngine ? ' active' : '');
-
-    const img = document.createElement('img');
-    img.src = engineFavicon(engine);
-    img.alt = engine.name;
-    img.onerror = function () {
-  this.src = DEFAULT_ICON;
-  this.onerror = null;
-};
-
-    const label = document.createElement('span');
-    label.textContent = engine.name;
-
-    btn.appendChild(img);
-    btn.appendChild(label);
-    btn.onclick = () => selectEngine(engine);
-    panel.appendChild(btn);
-  });
+  const hidden = panel.style.display === 'none';
+  panel.style.display = (typeof force === 'boolean') ? (force ? 'block' : 'none') : (hidden ? 'block' : 'none');
 }
 
-/* ── 开关内联面板 ── */
-function toggleEnginePanel() {
-  enginePanelOpen ? closeEnginePanel() : openEnginePanel();
+function updateCurrentEngineDisplay() {
+  const engine = searchEngines[currentEngineIndex];
+  document.getElementById('search-engine-icon').src = engine.icon;
+  document.getElementById('search-engine-icon').alt = engine.name;
+  document.getElementById('engineName').textContent = engine.name;
 }
 
-function openEnginePanel() {
-  enginePanelOpen = true;
-  renderEnginePanel();
-  const panel = document.getElementById('enginePanel');
-  panel.style.display = 'flex';
-  document.getElementById('engineArrow').style.transform = 'rotate(180deg)';
+// ========== 搜索功能 ==========
+function doSearch() {
+  const input = document.getElementById('searchInput');
+  const query = input.value.trim();
+  if (!query) { input.focus(); return; }
+  const engine = searchEngines[currentEngineIndex];
+  const url = engine.searchUrl.replace('{query}', encodeURIComponent(query));
+  window.open(url, '_blank');
 }
 
-function closeEnginePanel() {
-  enginePanelOpen = false;
-  document.getElementById('enginePanel').style.display = 'none';
-  document.getElementById('engineArrow').style.transform = '';
-}
-
-/* ── 清空搜索框 ── */
 function clearSearch() {
-  const input   = document.getElementById('searchInput');
-  const clearBtn = document.getElementById('clearBtn');
-  input.value   = '';
-  clearBtn.style.display = 'none';
+  const input = document.getElementById('searchInput');
+  input.value = '';
+  filterLinks();
+  document.getElementById('clearBtn').style.display = 'none';
   input.focus();
+}
+
+// ========== 链接过滤与渲染 ==========
+function filterLinks() {
+  const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+  document.getElementById('clearBtn').style.display = keyword.length > 0 ? 'flex' : 'none';
+  renderFilteredLinks(keyword);
+}
+
+function renderFilteredLinks(keyword) {
+  const container = document.getElementById('main-content');
+  
+  // 如果 linksData 为空，直接隐藏整个链接区域
+  if (!linksData || linksData.length === 0) {
+    container.innerHTML = '';
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'block'; // 有数据时显示
+
+  // 过滤匹配的链接
+  const filtered = linksData.map(sec => {
+    const items = sec.items.filter(item => {
+      if (!keyword) return true;
+      const s = (item.title + item.desc + (item['data-desc'] || '')).toLowerCase();
+      return s.includes(keyword);
+    });
+    return { ...sec, items };
+  }).filter(sec => sec.items.length > 0);
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty-state">没有匹配的链接</div>';
+    return;
+  }
+
+  let html = '';
+  filtered.forEach(sec => {
+    html += `<div class="section"><h2 class="section-title">${esc(sec.section)}</h2><div class="links-grid">`;
+    sec.items.forEach(item => {
+      const domain = getDomain(item.url);
+      let icon = '';
+      if (item.icon) {
+        const name = item.icon.replace(/^.*\//, '');
+        icon = SITE_ICON_BASE + name;
+      } else if (domain) {
+        icon = buildFaviconUrl(domain);
+      } else {
+        icon = buildFaviconUrl('');
+      }
+      const intranet = item.intranet || '';
+      html += `
+        <a class="link-card" href="${esc(item.url)}" target="_blank" title="${esc(item.desc || '')}">
+          <img class="link-icon" src="${icon}" alt="" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIi8+PHBhdGggZD0iTTIgMTJoMjAiLz48cGF0aCBkPSJNMTIgMmExNS4zIDE1LjMgMCAwIDEgNCAxMCAxNS4zIDE1LjMgMCAwIDEtNCAxMCAxNS4zIDE1LjMgMCAwIDEtNC0xMCAxNS4zIDE1LjMgMCAwIDEgNC0xMHoiLz48L3N2Zz4='">
+          <span class="link-title">${esc(item.title)}</span>
+          ${intranet ? '<span class="intranet-tag">内网</span>' : ''}
+        </a>`;
+    });
+    html += `</div></div>`;
+  });
+  container.innerHTML = html;
+}
+
+// ========== 内外网切换（预留） ==========
+let isIntranet = false;
+function toggleIntranet() {
+  isIntranet = !isIntranet;
   filterLinks();
 }
-window.clearSearch = clearSearch;
 
-/* ── 同步清空按钮显隐 ── */
-function syncClearBtn() {
-  const input    = document.getElementById('searchInput');
-  const clearBtn = document.getElementById('clearBtn');
-  clearBtn.style.display = input.value.length > 0 ? 'flex' : 'none';
+// ========== 随机背景图 ==========
+function setRandomBackground() {
+  const list = [
+    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80',
+    'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1920&q=80',
+    'https://images.unsplash.com/photo-1500964757637-c85e8a162699?w=1920&q=80',
+    'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1920&q=80',
+    'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1920&q=80',
+    'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=1920&q=80',
+    'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=1920&q=80'
+  ];
+  const url = list[Math.floor(Math.random() * list.length)];
+  document.getElementById('bgLayer').style.backgroundImage = `url(${url})`;
 }
 
-/* ── 执行搜索 ── */
-function doSearch() {
-  const kw = document.getElementById('searchInput').value.trim();
-  if (kw) window.open(currentEngine.url + encodeURIComponent(kw), '_blank');
-}
-window.doSearch = doSearch;
-
-/* ── 站内筛选 ── */
-function filterLinks() {
-  syncClearBtn();
-  const query = document.getElementById('searchInput').value.toLowerCase().trim();
-
-  document.querySelectorAll('.card').forEach(card => {
-    if (!query) {
-      card.classList.remove('hidden');
-    } else {
-      const title    = card.querySelector('.title')?.innerText.toLowerCase() ?? '';
-      const datadesc = (card.dataset.desc ?? '').toLowerCase();
-      card.classList.toggle('hidden', !title.includes(query) && !datadesc.includes(query));
-    }
-  });
-
-  document.querySelectorAll('.section').forEach(section => {
-    if (!query) {
-      section.classList.remove('section-hidden');
-    } else {
-      const visible = section.querySelectorAll('.card:not(.hidden)');
-      section.classList.toggle('section-hidden', visible.length === 0);
-    }
-  });
-}
-window.filterLinks = filterLinks;
-
-/* ── 动态渲染卡片 ── */
-function renderCards(sections) {
-  const main = document.getElementById('main-content');
-  main.innerHTML = '';
-
-  sections.forEach(({ section, items }) => {
-    const sec = document.createElement('div');
-    sec.className = 'section';
-
-    const h2 = document.createElement('h2');
-    h2.className = 'section-title';
-    h2.textContent = section;
-    sec.appendChild(h2);
-
-    const grid = document.createElement('div');
-    grid.className = 'link-container';
-
-    items.forEach(item => {
-      const a = document.createElement('a');
-      a.href         = getCardUrl(item);
-      a.target       = '_blank';
-      a.className    = 'card';
-      a.dataset.desc = item['data-desc'] ?? item.desc ?? '';
-      a.rel          = 'noopener noreferrer';
-      if (item.intranet) {
-        a.dataset.url      = item.url;
-        a.dataset.intranet = item.intranet;
-      }
-
-      const img = document.createElement('img');
-      img.className = 'favicon';
-      img.loading   = 'lazy';
-      img.src = item.icon ? item.icon : faviconSrc(item.url);
-      img.onerror   = function () {
-        const domain = getDomain(item.url);
-        if (domain && !this.dataset.fallbackTried) {
-          this.dataset.fallbackTried = '1';
-          this.src = `https://${domain}/favicon.ico`;
-        } else {
-          this.src = DEFAULT_ICON;
-          this.onerror = null;
-        }
-      };
-
-      const top = document.createElement('div');
-      top.className = 'card-top';
-      const titleEl = document.createElement('span');
-      titleEl.className = 'title';
-      titleEl.textContent = item.title;
-      top.appendChild(img);
-      top.appendChild(titleEl);
-
-      const desc = document.createElement('div');
-      desc.className = 'desc';
-      desc.textContent = item.desc ?? '';
-
-      const popup = document.createElement('div');
-      popup.className = 'info-popup';
-      popup.textContent = getDomain(getCardUrl(item)) ?? getCardUrl(item);
-
-      a.appendChild(top);
-      a.appendChild(desc);
-      a.appendChild(popup);
-      grid.appendChild(a);
-    });
-
-    sec.appendChild(grid);
-    main.appendChild(sec);
-  });
-
-  bindTouchTooltip();
-}
-
-/* ── 移动端长按 Tooltip ── */
-function bindTouchTooltip() {
-  if (window.matchMedia('(hover: none)').matches) {
-    let timer = null;
-    let activeCard = null;
-
-    function clearActive() {
-      if (activeCard) { activeCard.classList.remove('touch-active'); activeCard = null; }
-      clearTimeout(timer); timer = null;
-    }
-
-    document.querySelectorAll('.card').forEach(card => {
-      card.addEventListener('touchstart', () => {
-        clearActive();
-        timer = setTimeout(() => {
-          card.classList.add('touch-active');
-          activeCard = card;
-          setTimeout(clearActive, 2000);
-        }, 500);
-      }, { passive: true });
-
-      card.addEventListener('touchend',  () => { if (timer) clearTimeout(timer); });
-      card.addEventListener('touchmove', () => { clearTimeout(timer); timer = null; }, { passive: true });
-    });
-
-    document.addEventListener('touchstart', e => {
-      if (activeCard && !activeCard.contains(e.target)) clearActive();
-    }, { passive: true });
+// ========== 加载链接数据 ==========
+async function loadLinksData() {
+  try {
+    const res = await fetch('links.json');
+    if (!res.ok) throw new Error('加载失败');
+    linksData = await res.json();
+  } catch (e) {
+    console.warn('links.json 不可用，页面将只保留搜索功能', e);
+    linksData = [];
   }
+  filterLinks();
 }
 
-/* ── 随机背景 ── */
-function changeBackground() {
-  const url = `${BG_API}${Date.now()}`;
-  document.getElementById('bgLayer').style.backgroundImage = `url('${url}')`;
-}
-
-/* ── 入口 ── */
-document.addEventListener('DOMContentLoaded', async () => {
-  changeBackground();
-
-  renderSearchTabs();
-  updateSearchBoxEngine();
-
-  injectNetToggleBtn();
-  updateNetToggleBtn();
-
-  // 引擎触发器点击
-  document.getElementById('engineTrigger').addEventListener('click', () => {
+// ========== 事件绑定 ==========
+function bindEvents() {
+  document.getElementById('engineTrigger').addEventListener('click', (e) => {
+    e.stopPropagation();
     toggleEnginePanel();
   });
-
-  // 搜索框键盘事件
-  document.getElementById('searchInput').addEventListener('keydown', e => {
+  document.addEventListener('click', () => toggleEnginePanel(false));
+  document.getElementById('enginePanel').addEventListener('click', (e) => e.stopPropagation());
+  document.getElementById('searchInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doSearch();
-    if (e.key === 'Escape') closeEnginePanel();
   });
+}
 
-  try {
-    const res  = await fetch(LINKS_FILE);
-    const data = await res.json();
-    _linksData = data;
-    renderCards(data);
-  } catch (err) {
-    console.error('加载 links.json 失败：', err);
-    document.getElementById('main-content').innerHTML =
-      '<p style="color:rgba(255,255,255,0.5);text-align:center;padding:2rem;">链接数据加载失败，请检查 links.json 文件。</p>';
-  }
-});
+// ========== 初始化 ==========
+async function init() {
+  setRandomBackground();
+  renderEnginePanel();
+  updateCurrentEngineDisplay();
+  await loadLinksData();
+  bindEvents();
+  const input = document.getElementById('searchInput');
+  document.getElementById('clearBtn').style.display = input.value.trim() ? 'flex' : 'none';
+}
+
+init();
