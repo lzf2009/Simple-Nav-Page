@@ -51,7 +51,7 @@ const searchEngines = [
 ];
 
 // ========== 当前状态 ==========
-let currentEngineIndex = 0;           // 当前选中的搜索引擎索引
+let currentEngineIndex = 2;           // 当前选中的搜索引擎索引
 let linksData = [];                   // 从 links.json 加载的站点数据（现为空）
 
 // ========== 工具函数 ==========
