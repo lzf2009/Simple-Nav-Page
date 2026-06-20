@@ -4,7 +4,7 @@
 
 // ── 图标 & 背景 配置 ────────────────────────────────────────
 const FAVICON_PROVIDER = 'google';
-const PROXY = '';
+const PROXY = 'https://sim.1546879868.workers.dev';
 
 function withProxy(originUrl) {
   if (!PROXY) return originUrl;
