@@ -1,411 +1,51 @@
-/**
- * ====================================================
- *  Simple Nav Page - 主逻辑脚本
- *  包含功能：
- *    - 随机背景图
- *    - 搜索引擎切换与搜索
- *    - 站内链接过滤（基于 links.json）
- *    - 图标获取代理配置
- *    - 内外网切换（可选，当前保留接口）
- * ====================================================
- */
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <!-- 页面标题改为“快捷导航” -->
+  <title>快捷导航</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧭</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="bgLayer"></div>
+<div id="bgOverlay"></div>
+<div class="container">
+  <div class="header-area">
+    <span class="header-icon">🧭</span>
+    <div>
+      <!-- 主标题改为“快捷导航” -->
+      <h1>快捷导航</h1>
+      <p class="header-subtitle">沉舟侧畔千帆过，病树前头万木春。</p>
+    </div>
+    <span class="header-icon">✦</span>
+  </div>
 
-// ==================== 基础配置 ====================
+  <div class="search-wrapper">
+    <div class="search-tabs" id="searchTabs"></div>
+    <div class="search-box">
+      <button class="engine-trigger" id="engineTrigger" aria-label="切换搜索引擎">
+        <img id="search-engine-icon" src="" alt="搜索引擎图标">
+        <span class="engine-name" id="engineName"></span>
+        <span class="engine-arrow" id="engineArrow">▾</span>
+      </button>
+      <div class="search-divider"></div>
+      <input type="text" id="searchInput" placeholder="搜索网页 / 定位站内网站" autocomplete="off" oninput="filterLinks()" />
+      <button class="clear-btn" id="clearBtn" aria-label="清空" style="display:none;" onclick="clearSearch()">✕</button>
+      <button class="search-submit-btn" onclick="doSearch()" aria-label="搜索">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </button>
+    </div>
+    <div class="engine-list" id="enginePanel" style="display:none;"></div>
+  </div>
 
-/**
- * 图标提供源：'google' 或 'duckduckgo'
- * 决定了自动获取网站 favicon 的 API
- */
-const FAVICON_PROVIDER = 'duckduckgo'; // 可选 'google'
-
-/**
- * 图标代理地址：用于绕过国内网络限制，加速图标加载
- * 留空则不使用代理，直连图标服务
- */
-const PROXY = 'https://sim.1546879868.workers.dev'; // 你的 Worker 代理地址
-
-/**
- * 本地自定义图标的基础路径
- * 图片存放在 icons/logos/ 文件夹下，由后台管理上传
- */
-const SITE_ICON_BASE = location.origin + location.pathname.replace(/\/[^/]*$/, '') + '/icons/logos/';
-
-// ==================== 搜索引擎列表 ====================
-
-/**
- * 搜索引擎配置数组
- * 每个引擎包含：
- *   name      - 显示名称
- *   icon      - 引擎图标 URL
- *   searchUrl - 搜索接口，查询关键词用 {query} 占位
- *   type      - 引擎类型，用于分类（'web', 'ai', 'media' 等）
- * 
- * 注意：删除了原有的百度、搜狗、360搜索，新增了 GitHub
- */
-const searchEngines = [
-  {
-    name: 'GitHub',
-    icon: 'https://github.com/favicon.ico',
-    searchUrl: 'https://github.com/search?q={query}',
-    type: 'web'
-  },
-  {
-    name: 'Google',
-    icon: 'https://www.google.com/favicon.ico',
-    searchUrl: 'https://www.google.com/search?q={query}',
-    type: 'web'
-  },
-  {
-    name: 'Bing',
-    icon: 'https://www.bing.com/favicon.ico',
-    searchUrl: 'https://www.bing.com/search?q={query}',
-    type: 'web'
-  },
-  {
-    name: 'DuckDuckGo',
-    icon: 'https://duckduckgo.com/favicon.ico',
-    searchUrl: 'https://duckduckgo.com/?q={query}',
-    type: 'web'
-  }
-  // 可继续添加其他搜索引擎，例如 AI 助手等
-];
-
-// ==================== 当前状态 ====================
-
-/** 当前选中的搜索引擎索引 */
-let currentEngineIndex = 0;
-
-/** 从 links.json 加载的站点数据（现为空数组） */
-let linksData = [];
-
-// ==================== 工具函数 ====================
-
-/**
- * 对字符串进行安全转义，防止 XSS
- */
-function esc(str) {
-  if (!str) return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-/**
- * 从 URL 中提取域名
- */
-function getDomain(url) {
-  try {
-    return new URL(url).hostname;
-  } catch (e) {
-    return '';
-  }
-}
-
-/**
- * 根据配置的图标提供源生成 favicon URL
- * 如果设置了代理，则通过代理访问
- */
-function buildFaviconUrl(domain) {
-  if (!domain) {
-    // 没有域名时返回一个内联的默认地球 SVG
-    return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIi8+PHBhdGggZD0iTTIgMTJoMjAiLz48cGF0aCBkPSJNMTIgMmExNS4zIDE1LjMgMCAwIDEgNCAxMCAxNS4zIDE1LjMgMCAwIDEtNCAxMCAxNS4zIDE1LjMgMCAwIDEtNC0xMCAxNS4zIDE1LjMgMCAwIDEgNC0xMHoiLz48L3N2Zz4=';
-  }
-
-  let url;
-  if (FAVICON_PROVIDER === 'google') {
-    url = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
-  } else {
-    // 默认 duckduckgo
-    url = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
-  }
-
-  // 如果配置了代理，则加上代理前缀
-  if (PROXY) {
-    url = PROXY + '/' + url.replace(/^https?:\/\//, '');
-  }
-  return url;
-}
-
-// ==================== 搜索引擎面板 ====================
-
-/**
- * 渲染搜索引擎选择面板
- */
-function renderEnginePanel() {
-  const panel = document.getElementById('enginePanel');
-  // 生成引擎列表的 HTML，每个引擎一个 div
-  panel.innerHTML = searchEngines.map((engine, index) => {
-    const isActive = index === currentEngineIndex;
-    return `
-      <div class="engine-item ${isActive ? 'active' : ''}" 
-           onclick="switchEngine(${index})" 
-           title="${esc(engine.name)}">
-        <img src="${esc(engine.icon)}" alt="${esc(engine.name)}" onerror="this.style.display='none'">
-        <span>${esc(engine.name)}</span>
-        ${isActive ? '<span class="check-mark">✓</span>' : ''}
-      </div>
-    `;
-  }).join('');
-}
-
-/**
- * 切换当前搜索引擎
- * @param {number} index 引擎在 searchEngines 数组中的索引
- */
-function switchEngine(index) {
-  currentEngineIndex = index;
-  // 更新搜索框左侧显示的引擎信息
-  updateCurrentEngineDisplay();
-  // 重新渲染面板以反映选中状态
-  renderEnginePanel();
-  // 关闭引擎面板
-  toggleEnginePanel(false);
-  // 聚焦回搜索输入框，方便直接输入
-  document.getElementById('searchInput').focus();
-}
-
-/**
- * 切换引擎面板的显示/隐藏
- * @param {boolean|null} force 强制显示或隐藏，不传则取反
- */
-function toggleEnginePanel(force) {
-  const panel = document.getElementById('enginePanel');
-  const isHidden = panel.style.display === 'none';
-  if (typeof force === 'boolean') {
-    panel.style.display = force ? 'block' : 'none';
-  } else {
-    panel.style.display = isHidden ? 'block' : 'none';
-  }
-}
-
-/**
- * 更新搜索框左侧显示的当前搜索引擎图标和名称
- */
-function updateCurrentEngineDisplay() {
-  const engine = searchEngines[currentEngineIndex];
-  document.getElementById('search-engine-icon').src = engine.icon;
-  document.getElementById('search-engine-icon').alt = engine.name;
-  document.getElementById('engineName').textContent = engine.name;
-}
-
-// ==================== 搜索功能 ====================
-
-/**
- * 执行搜索：
- * 如果搜索输入框内容不为空，则使用当前选中的搜索引擎打开搜索结果页
- */
-function doSearch() {
-  const input = document.getElementById('searchInput');
-  const query = input.value.trim();
-  if (!query) {
-    // 如果没有输入内容，直接聚焦输入框
-    input.focus();
-    return;
-  }
-
-  const engine = searchEngines[currentEngineIndex];
-  // 将搜索 URL 中的 {query} 占位符替换为编码后的搜索词
-  const searchUrl = engine.searchUrl.replace('{query}', encodeURIComponent(query));
-  // 在新标签页打开搜索结果
-  window.open(searchUrl, '_blank');
-}
-
-/**
- * 清空搜索输入框并重新显示所有链接（无链接可显示时为空）
- */
-function clearSearch() {
-  const input = document.getElementById('searchInput');
-  input.value = '';
-  filterLinks(); // 重新过滤，由于 linksData 为空，结果也为空
-  document.getElementById('clearBtn').style.display = 'none';
-  input.focus();
-}
-
-// ==================== 站内链接过滤 ====================
-
-/**
- * 根据搜索输入框中的关键词过滤站内链接（目前 linksData 为空，此函数保留以便将来使用）
- */
-function filterLinks() {
-  const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
-  const clearBtn = document.getElementById('clearBtn');
-  // 控制清空按钮的显示
-  clearBtn.style.display = keyword.length > 0 ? 'flex' : 'none';
-
-  // 渲染过滤后的链接（由于 linksData 为空，主内容区将显示空状态）
-  renderFilteredLinks(keyword);
-}
-
-/**
- * 根据关键词过滤并渲染链接列表
- * @param {string} keyword 过滤关键词（小写）
- */
-function renderFilteredLinks(keyword) {
-  const container = document.getElementById('main-content');
-  
-  // 如果 linksData 为空，直接显示提示信息
-  if (linksData.length === 0) {
-    container.innerHTML = '<div class="empty-state">暂无导航链接，可通过后台添加</div>';
-    return;
-  }
-
-  // 遍历每个分类，筛选出匹配的链接
-  const filteredSections = linksData.map(section => {
-    const filteredItems = section.items.filter(item => {
-      if (!keyword) return true; // 无关键词时显示全部
-      const title = (item.title || '').toLowerCase();
-      const desc = (item.desc || '').toLowerCase();
-      const dataDesc = (item['data-desc'] || '').toLowerCase();
-      // 匹配标题、描述、搜索关键词
-      return title.includes(keyword) || desc.includes(keyword) || dataDesc.includes(keyword);
-    });
-    return {
-      ...section,
-      items: filteredItems
-    };
-  }).filter(section => section.items.length > 0); // 过滤掉无匹配项的分类
-
-  // 如果没有匹配项，显示空状态
-  if (filteredSections.length === 0) {
-    container.innerHTML = '<div class="empty-state">没有找到匹配的链接</div>';
-    return;
-  }
-
-  // 生成 HTML
-  let html = '';
-  filteredSections.forEach(section => {
-    html += `<div class="section">
-      <h2 class="section-title">${esc(section.section)}</h2>
-      <div class="links-grid">`;
-    section.items.forEach(item => {
-      const domain = getDomain(item.url);
-      let favicon = '';
-      if (item.icon) {
-        // 自定义图标，使用 SITE_ICON_BASE + 图标文件名
-        const iconName = item.icon.replace(/^.*\//, '');
-        favicon = `${SITE_ICON_BASE}${iconName}`;
-      } else if (domain) {
-        favicon = buildFaviconUrl(domain);
-      } else {
-        favicon = buildFaviconUrl(''); // 默认地球图标
-      }
-      const intranet = item.intranet || '';
-
-      html += `
-        <a class="link-card" href="${esc(item.url)}" target="_blank" title="${esc(item.desc || '')}">
-          <img class="link-icon" src="${favicon}" alt="" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIi8+PHBhdGggZD0iTTIgMTJoMjAiLz48cGF0aCBkPSJNMTIgMmExNS4zIDE1LjMgMCAwIDEgNCAxMCAxNS4zIDE1LjMgMCAwIDEtNCAxMCAxNS4zIDE1LjMgMCAwIDEtNC0xMCAxNS4zIDE1LjMgMCAwIDEgNC0xMHoiLz48L3N2Zz4='">
-          <span class="link-title">${esc(item.title)}</span>
-          ${intranet ? `<span class="intranet-tag" title="内网地址：${esc(intranet)}">内网</span>` : ''}
-        </a>`;
-    });
-    html += `</div></div>`;
-  });
-
-  container.innerHTML = html;
-}
-
-// ==================== 内外网切换（预留） ====================
-// 如果将来 links.json 中配置了内网地址，可在这里实现一键切换外网/内网链接
-let isIntranet = false; // 默认外网模式
-
-function toggleIntranet() {
-  isIntranet = !isIntranet;
-  // 重新渲染所有链接
-  filterLinks();
-  // 提示用户当前模式
-  alert(isIntranet ? '已切换到内网地址' : '已切换到外网地址');
-  // 实际使用时，link-card 的 href 会根据 isIntranet 选用 intranet 字段
-}
-
-// ==================== 随机背景图 ====================
-
-/**
- * 设置随机背景图
- * 背景图片列表可以根据需要修改或从外部获取
- */
-function setRandomBackground() {
-  // 高质量免费背景图列表（来自 Unsplash 等，尺寸适合全屏）
-  const backgrounds = [
-    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80',
-    'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1920&q=80',
-    'https://images.unsplash.com/photo-1500964757637-c85e8a162699?w=1920&q=80',
-    'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1920&q=80',
-    'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1920&q=80',
-    'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=1920&q=80',
-    'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=1920&q=80'
-  ];
-  // 随机选择一张
-  const randomIndex = Math.floor(Math.random() * backgrounds.length);
-  const bgUrl = backgrounds[randomIndex];
-  // 设置背景图层
-  const bgLayer = document.getElementById('bgLayer');
-  bgLayer.style.backgroundImage = `url(${bgUrl})`;
-}
-
-// ==================== 加载链接数据 ====================
-
-/**
- * 从 links.json 加载站点链接数据
- */
-async function loadLinksData() {
-  try {
-    const response = await fetch('links.json');
-    if (!response.ok) throw new Error('links.json 加载失败');
-    linksData = await response.json();
-  } catch (error) {
-    console.warn('无法加载 links.json，将不显示任何链接。', error);
-    linksData = []; // 确保为空数组
-  }
-  // 初始渲染（无关键词，显示全部链接）
-  filterLinks();
-}
-
-// ==================== 事件监听与初始化 ====================
-
-/**
- * 绑定 UI 交互事件
- */
-function bindEvents() {
-  // 引擎触发按钮：点击切换引擎面板显示/隐藏
-  document.getElementById('engineTrigger').addEventListener('click', function(e) {
-    e.stopPropagation();
-    toggleEnginePanel();
-  });
-
-  // 点击页面其他地方时关闭引擎面板
-  document.addEventListener('click', function() {
-    toggleEnginePanel(false);
-  });
-  // 防止面板自身点击冒泡导致关闭
-  const enginePanel = document.getElementById('enginePanel');
-  enginePanel.addEventListener('click', function(e) {
-    e.stopPropagation();
-  });
-
-  // 搜索输入框按回车键直接搜索
-  document.getElementById('searchInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-      doSearch();
-    }
-  });
-}
-
-/**
- * 页面初始化函数
- */
-async function init() {
-  // 设置随机背景
-  setRandomBackground();
-  // 渲染搜索引擎面板
-  renderEnginePanel();
-  // 更新当前引擎显示
-  updateCurrentEngineDisplay();
-  // 加载链接数据（目前为空，但保留加载逻辑）
-  await loadLinksData();
-  // 绑定事件
-  bindEvents();
-  // 初始显示清空按钮状态（根据输入框内容）
-  const input = document.getElementById('searchInput');
-  document.getElementById('clearBtn').style.display = input.value.trim().length > 0 ? 'flex' : 'none';
-}
-
-// 启动一切
-init();
+  <!-- 链接容器（当前无链接，将自动隐藏） -->
+  <div id="main-content" style="display:none;"></div>
+</div>
+<script src="main.js"></script>
+</body>
+</html>
