@@ -8,7 +8,7 @@
         "desc": "代码托管、开源协作",
         "data-desc": "全球最大代码托管与开源协作平台，GitHub、git",
         "icon": "icons/logos/github.svg",
-        "intranet": "测试"
+        "intranet": "192.168.1.12"
       },
       {
         "title": "哔哩哔哩",
