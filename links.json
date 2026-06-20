@@ -55,6 +55,41 @@
     ]
   },
   {
+    "section": "nas",
+    "items": [
+      {
+        "title": "openlist",
+        "url": "192.168.1.12:5244",
+        "desc": "文件存储"
+      },
+      {
+        "title": "cpus web",
+        "url": "192.168.1.12:8888",
+        "desc": "网页端打印"
+      },
+      {
+        "title": "qbittorrent",
+        "url": "192.168.1.12:8080",
+        "desc": "种子下载做种"
+      },
+      {
+        "title": "ttyd",
+        "url": "192.168.1.12:7681",
+        "desc": "网页终端"
+      },
+      {
+        "title": "cups",
+        "url": "192.168.1.12:631",
+        "desc": "打印机"
+      },
+      {
+        "title": "openlist 后台",
+        "url": "http://192.168.1.12:5244/@manage",
+        "desc": "管理 openlist "
+      }
+    ]
+  },
+  {
     "section": "AI",
     "items": [
       {
@@ -969,41 +1004,6 @@
         "url": "https://saaslandingpage.com/",
         "desc": "优秀落地页设计精选",
         "data-desc": "SaaS 产品落地页设计案例精选，saaslandingpage，设计灵感参考"
-      }
-    ]
-  },
-  {
-    "section": "nas",
-    "items": [
-      {
-        "title": "openlist",
-        "url": "192.168.1.12:5244",
-        "desc": "文件存储"
-      },
-      {
-        "title": "cpus web",
-        "url": "192.168.1.12:8888",
-        "desc": "网页端打印"
-      },
-      {
-        "title": "qbittorrent",
-        "url": "192.168.1.12:8080",
-        "desc": "种子下载做种"
-      },
-      {
-        "title": "ttyd",
-        "url": "192.168.1.12:7681",
-        "desc": "网页终端"
-      },
-      {
-        "title": "cups",
-        "url": "192.168.1.12:631",
-        "desc": "打印机"
-      },
-      {
-        "title": "openlist 后台",
-        "url": "http://192.168.1.12:5244/@manage",
-        "desc": "管理 openlist "
       }
     ]
   }
