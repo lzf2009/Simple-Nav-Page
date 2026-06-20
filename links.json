@@ -904,18 +904,6 @@
         "url": "https://nga.178.com/",
         "desc": "游戏论坛社区",
         "data-desc": "国内知名游戏论坛社区，NGA，魔兽、网游、单机游戏深度讨论"
-      },
-      {
-        "title": "IGN",
-        "url": "https://www.ign.com/",
-        "desc": "国际游戏评测媒体",
-        "data-desc": "全球知名游戏评测与资讯媒体，IGN，游戏评分、预告片、攻略"
-      },
-      {
-        "title": "米哈游",
-        "url": "https://www.mihoyo.com/",
-        "desc": "原神、星铁、崩坏",
-        "data-desc": "米哈游官方网站，原神、崩坏：星穹铁道、崩坏3，二次元游戏"
       }
     ]
   },
@@ -981,6 +969,41 @@
         "url": "https://saaslandingpage.com/",
         "desc": "优秀落地页设计精选",
         "data-desc": "SaaS 产品落地页设计案例精选，saaslandingpage，设计灵感参考"
+      }
+    ]
+  },
+  {
+    "section": "nas",
+    "items": [
+      {
+        "title": "openlist",
+        "url": "192.168.1.12:5244",
+        "desc": "文件存储"
+      },
+      {
+        "title": "cpus web",
+        "url": "192.168.1.12:8888",
+        "desc": "网页端打印"
+      },
+      {
+        "title": "qbittorrent",
+        "url": "192.168.1.12:8080",
+        "desc": "种子下载做种"
+      },
+      {
+        "title": "ttyd",
+        "url": "192.168.1.12:7681",
+        "desc": "网页终端"
+      },
+      {
+        "title": "cups",
+        "url": "192.168.1.12:631",
+        "desc": "打印机"
+      },
+      {
+        "title": "openlist 后台",
+        "url": "http://192.168.1.12:5244/@manage",
+        "desc": "管理 openlist "
       }
     ]
   }
